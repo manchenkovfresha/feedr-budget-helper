@@ -203,10 +203,25 @@
     }).join('');
   }
 
+  function sendToTab(message) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs[0]) return;
+      chrome.tabs.sendMessage(tabs[0].id, message, () => {
+        if (chrome.runtime.lastError) return;
+        queryStatus();
+      });
+    });
+  }
+
+  function sendSetIncludePaid(value) {
+    chrome.storage.local.set({ feedrIncludePaid: value });
+    sendToTab({ action: 'setIncludePaid', includePaid: value });
+  }
+
   function render(status) {
     if (!contentEl) return;
 
-    const { budget, totalCount, providers = {}, showAll, orderPlaced } = status;
+    const { budget, totalCount, providers = {}, showAll, orderPlaced, includePaid = true, paidBudget = 0 } = status;
 
     if (orderPlaced) {
       contentEl.innerHTML = '<p class="order-placed">✅ Your order has been placed.<br>Select another day to see the options.</p>';
@@ -220,9 +235,14 @@
     const btnClass = showAll ? 'hide' : 'show';
     const btnLabel = showAll ? 'Re-apply budget overlays' : 'Show all meals';
 
+    const paidToggle = paidBudget > 0
+      ? `<label class="option"><input type="checkbox" id="includePaidCb"${includePaid ? ' checked' : ''} /> Include paid balance (£${paidBudget.toFixed(2)})</label>`
+      : '';
+
     contentEl.innerHTML = `
       <p class="stat">Available: <strong>${escHtml(formatBudget(budget))}</strong></p>
       <p class="stat">Affordable: <strong>${affordable} / ${totalCount} (${overallPct}%)</strong></p>
+      ${paidToggle}
       ${providerRows ? `<hr class="divider" />${providerRows}` : ''}
       <hr class="divider" />
       <div class="actions">
@@ -231,10 +251,15 @@
       </div>
     `;
 
+    const includePaidCb = document.getElementById('includePaidCb');
+    if (includePaidCb) {
+      includePaidCb.addEventListener('change', () => {
+        sendSetIncludePaid(includePaidCb.checked);
+      });
+    }
+
     document.getElementById('toggleBtn').addEventListener('click', () => {
-      const newShowAll = !showAll;
-      chrome.storage.local.set({ feedrShowAll: newShowAll });
-      sendToggle(newShowAll);
+      sendToggle(!showAll);
     });
 
     document.getElementById('shareBtn').addEventListener('click', () => {
@@ -247,13 +272,8 @@
   // ---------------------------------------------------------------------------
 
   function sendToggle(newShowAll) {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (!tabs[0]) return;
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'toggle', showAll: newShowAll }, () => {
-        if (chrome.runtime.lastError) return;
-        queryStatus();
-      });
-    });
+    chrome.storage.local.set({ feedrShowAll: newShowAll });
+    sendToTab({ action: 'toggle', showAll: newShowAll });
   }
 
   function queryStatus(retries = 5, delay = 500) {

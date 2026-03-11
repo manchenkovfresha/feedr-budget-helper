@@ -2,6 +2,8 @@
   'use strict';
 
   let budget = null;
+  let paidBudget = 0;
+  let includePaid = true;
   let showAll = false;
   let observer = null;
   let applyTimer = null;
@@ -20,23 +22,30 @@
       if (m) { free = parseFloat(m[1]); break; }
     }
 
-    // Paid balance: a chip whose label-small shows "£" and label-medium shows the amount
+    // Paid balance: the "£" icon chip is nested inside an outer chip that holds the amount.
+    // Structure: outer MuiChip-sizeMedium > [inner MuiChip-sizeSmall > "£", span.MuiChip-labelMedium "0.01"]
     for (const el of document.querySelectorAll('.MuiChip-labelSmall')) {
       if (el.textContent.trim() !== '£') continue;
-      let chipRoot = el.parentElement;
-      while (chipRoot && !chipRoot.classList.contains('MuiChip-root')) {
-        chipRoot = chipRoot.parentElement;
+      // Walk up to the inner chip-root (sizeSmall), then one more step to the outer chip-root
+      let innerChip = el.parentElement;
+      while (innerChip && !innerChip.classList.contains('MuiChip-root')) {
+        innerChip = innerChip.parentElement;
       }
-      if (!chipRoot) continue;
-      const medLabel = chipRoot.querySelector('.MuiChip-labelMedium');
+      if (!innerChip) continue;
+      const outerChip = innerChip.parentElement;
+      if (!outerChip) continue;
+      const medLabel = outerChip.querySelector('.MuiChip-labelMedium');
       if (medLabel) {
         const m = medLabel.textContent.trim().match(/^([\d.]+)$/);
         if (m) { paid = parseFloat(m[1]); break; }
       }
     }
 
+    paidBudget = paid;
+
     // Always overwrite — prevents stale budget persisting across SPA navigation
-    budget = (free > 0 || paid > 0) ? paid + free : null;
+    const effective = free + (includePaid ? paid : 0);
+    budget = effective > 0 ? effective : null;
     return budget;
   }
 
@@ -213,6 +222,8 @@
 
       sendResponse({
         budget,
+        paidBudget,
+        includePaid,
         hiddenCount: getHiddenCount(),
         totalCount,
         providers,
@@ -229,6 +240,14 @@
       sendResponse({ ok: true });
       return true;
     }
+
+    if (message.action === 'setIncludePaid') {
+      includePaid = message.includePaid;
+      detectBudget();
+      applyHiding();
+      sendResponse({ ok: true });
+      return true;
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -236,8 +255,9 @@
   // ---------------------------------------------------------------------------
 
   function init() {
-    chrome.storage.local.get(['feedrShowAll'], (result) => {
+    chrome.storage.local.get(['feedrShowAll', 'feedrIncludePaid'], (result) => {
       showAll = !!result.feedrShowAll;
+      includePaid = result.feedrIncludePaid !== false; // default true
       detectBudget();
       applyHiding();
     });

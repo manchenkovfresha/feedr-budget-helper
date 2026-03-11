@@ -122,7 +122,10 @@
   // ---------------------------------------------------------------------------
 
   function applyHiding() {
-    if (budget === null) return;
+    if (budget === null || detectOrderPlaced()) {
+      revealAll();
+      return;
+    }
 
     // Pause the observer so our own DOM mutations do not re-trigger this function.
     if (observer) observer.disconnect();

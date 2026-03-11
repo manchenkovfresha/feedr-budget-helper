@@ -64,13 +64,22 @@
     const ctx = canvas.getContext('2d');
     ctx.scale(SCALE, SCALE);
 
+    // Border
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(0.5, 0.5, W - 1, H - 1, 10);
+    ctx.stroke();
+
     // Background
     ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
     ctx.roundRect(0, 0, W, H, 10);
     ctx.fill();
 
     // Green header
     ctx.fillStyle = GREEN;
+    ctx.beginPath();
     ctx.roundRect(0, 0, W, HEADER_H, [10, 10, 0, 0]);
     ctx.fill();
 
@@ -135,10 +144,12 @@
         y += 8;
         const barW = W - PAD * 2;
         ctx.fillStyle = '#eeeeee';
+        ctx.beginPath();
         ctx.roundRect(PAD, y, barW, 5, 2.5);
         ctx.fill();
         if (pct > 0) {
           ctx.fillStyle = GREEN;
+          ctx.beginPath();
           ctx.roundRect(PAD, y, barW * pct / 100, 5, 2.5);
           ctx.fill();
         }
@@ -157,14 +168,14 @@
         .then(() => {
           const btn = document.getElementById('shareBtn');
           if (!btn) return;
-          btn.textContent = 'Copied!';
-          setTimeout(() => { btn.textContent = 'Share stats as image'; }, 1500);
+          btn.textContent = 'Image copied!';
+          setTimeout(() => { btn.textContent = 'Share'; }, 1500);
         })
         .catch(() => {
           const btn = document.getElementById('shareBtn');
           if (!btn) return;
           btn.textContent = 'Failed — try again';
-          setTimeout(() => { btn.textContent = 'Share stats as image'; }, 2000);
+          setTimeout(() => { btn.textContent = 'Share'; }, 2000);
         });
     }, 'image/png');
   }
@@ -216,7 +227,7 @@
       <hr class="divider" />
       <div class="actions">
         <button class="${btnClass}" id="toggleBtn">${btnLabel}</button>
-        <button class="share" id="shareBtn">Share stats as image</button>
+        <button class="share" id="shareBtn">Share</button>
       </div>
     `;
 

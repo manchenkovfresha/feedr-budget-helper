@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
   <title>Feedr Budget Helper</title>
+  <link rel="icon" href="icons/icon16.png" />
   <style>
     * {
       box-sizing: border-box;
@@ -69,6 +70,14 @@
       padding: 8px 0;
     }
 
+    .order-placed {
+      font-size: 13px;
+      color: #444;
+      text-align: center;
+      padding: 8px 0;
+      line-height: 1.5;
+    }
+
     button {
       width: 100%;
       padding: 9px 12px;
@@ -103,12 +112,16 @@
       background: #f5f5f5;
       color: #555;
       border: 1px solid #ddd;
-      padding: 9px 10px;
-      flex-shrink: 0;
     }
 
     button.share:hover {
       background: #ebebeb;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
 
     .provider {
@@ -139,6 +152,20 @@
 
     .provider-pct strong {
       color: #2d9e5f;
+    }
+
+    .provider-bar {
+      margin-top: 4px;
+      height: 6px;
+      border-radius: 3px;
+      background: #eee;
+      overflow: hidden;
+    }
+
+    .provider-bar-fill {
+      height: 100%;
+      background: #2d9e5f;
+      border-radius: 3px;
     }
   </style>
 </head>

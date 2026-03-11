@@ -2,14 +2,13 @@
   "manifest_version": 3,
   "name": "Feedr Budget Helper",
   "version": "1.0.0",
-  "description": "Hides meal cards on Feedr that exceed your available balance.",
-  "permissions": ["storage", "clipboardWrite"],
+  "description": "Automatically marks meal cards on Feedr that exceed your available balance.",
+  "homepage_url": "https://github.com/artem-manchenkov/feedr-hider",
+  "permissions": ["storage"],
+  "host_permissions": ["*://feedr.co/*"],
   "content_scripts": [
     {
-      "matches": [
-        "*://feedr.co/*/canteen*",
-        "*://feedr.co/*/canteen"
-      ],
+      "matches": ["*://feedr.co/*/canteen*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }

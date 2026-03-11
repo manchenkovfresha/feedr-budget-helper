@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feedr Budget Helper</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #fff;
+      color: #1a1a1a;
+      width: 240px;
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: #2d9e5f;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .stat {
+      font-size: 13px;
+      color: #444;
+      margin-bottom: 6px;
+    }
+
+    .stat strong {
+      color: #2d9e5f;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #eee;
+      margin: 12px 0;
+    }
+
+    .no-page {
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+      padding: 8px 0;
+    }
+
+    button {
+      width: 100%;
+      padding: 9px 12px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button.show {
+      background: #2d9e5f;
+      color: #fff;
+    }
+
+    button.show:hover {
+      background: #268a52;
+    }
+
+    button.hide {
+      background: #f0faf4;
+      color: #2d9e5f;
+      border: 1px solid #b6e5cc;
+    }
+
+    button.hide:hover {
+      background: #ddf2e8;
+    }
+
+    button.share {
+      background: #f5f5f5;
+      color: #555;
+      border: 1px solid #ddd;
+      padding: 9px 10px;
+      flex-shrink: 0;
+    }
+
+    button.share:hover {
+      background: #ebebeb;
+    }
+
+    .provider {
+      margin-bottom: 10px;
+    }
+
+    .provider-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 12px;
+    }
+
+    .provider-name {
+      color: #333;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px;
+    }
+
+    .provider-pct {
+      color: #666;
+      white-space: nowrap;
+      margin-left: 8px;
+    }
+
+    .provider-pct strong {
+      color: #2d9e5f;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">£</div>
+    <span class="title">Feedr Budget Helper</span>
+  </div>
+
+  <div id="content">
+    <p class="no-page">Navigate to a Feedr canteen page to see budget info.</p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -5,6 +5,7 @@
   let paidBudget = 0;
   let includePaid = true;
   let showAll = false;
+  let currentSort = 'price-asc';
   let observer = null;
   let applyTimer = null;
 
@@ -197,6 +198,84 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Card sorting
+  // ---------------------------------------------------------------------------
+
+  function sortCards(mode) {
+    currentSort = mode;
+    if (observer) observer.disconnect();
+
+    const knownVendors = getKnownVendors();
+    const priceEls = getPriceElements();
+    const seen = new Set();
+    const cardData = [];
+
+    for (const { el, price } of priceEls) {
+      const card = findCardRoot(el);
+      if (!card || seen.has(card)) continue;
+      seen.add(card);
+      const name = getProviderName(card, knownVendors) || '';
+      cardData.push({ card, price, name });
+    }
+
+    if (!cardData.length) {
+      if (observer) observer.observe(document.body, { childList: true, subtree: true });
+      return;
+    }
+
+    // Cards may each be wrapped in a Grid item (or similar container).
+    // Walk up from each card to find the movable element: the direct child
+    // of the shared container that all cards live within.
+    function findContainer(cards) {
+      // Try the card itself, then walk up through wrapper layers.
+      for (let depth = 0; depth < 5; depth++) {
+        const elements = cards.map(d => {
+          let el = d.card;
+          for (let i = 0; i < depth; i++) {
+            if (!el.parentElement) return null;
+            el = el.parentElement;
+          }
+          return el;
+        });
+        if (elements.some(e => e === null)) break;
+        const parents = new Set(elements.map(e => e.parentElement));
+        if (parents.size === 1) {
+          const container = elements[0].parentElement;
+          return { container, getMovable: (d) => {
+            let el = d.card;
+            for (let i = 0; i < depth; i++) el = el.parentElement;
+            return el;
+          }};
+        }
+      }
+      return null;
+    }
+
+    const result = findContainer(cardData);
+    if (!result) {
+      if (observer) observer.observe(document.body, { childList: true, subtree: true });
+      return;
+    }
+
+    const { container, getMovable } = result;
+
+    const comparators = {
+      'price-asc': (a, b) => a.price - b.price,
+      'price-desc': (a, b) => b.price - a.price,
+      'name-asc': (a, b) => a.name.localeCompare(b.name),
+      'name-desc': (a, b) => b.name.localeCompare(a.name),
+    };
+    const cmp = comparators[mode] || comparators['price-asc'];
+    cardData.sort(cmp);
+
+    for (const d of cardData) {
+      container.appendChild(getMovable(d));
+    }
+
+    if (observer) observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // ---------------------------------------------------------------------------
   // Chrome message listener
   // ---------------------------------------------------------------------------
 
@@ -228,6 +307,7 @@
         totalCount,
         providers,
         showAll,
+        currentSort,
         orderPlaced: detectOrderPlaced(),
       });
       return true;
@@ -237,6 +317,12 @@
       showAll = message.showAll;
       if (showAll) revealAll();
       else { detectBudget(); applyHiding(); }
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message.action === 'sortCards') {
+      sortCards(message.sort);
       sendResponse({ ok: true });
       return true;
     }
@@ -255,11 +341,13 @@
   // ---------------------------------------------------------------------------
 
   function init() {
-    chrome.storage.local.get(['feedrShowAll', 'feedrIncludePaid'], (result) => {
+    chrome.storage.local.get(['feedrShowAll', 'feedrIncludePaid', 'feedrSort'], (result) => {
       showAll = !!result.feedrShowAll;
       includePaid = result.feedrIncludePaid !== false; // default true
+      currentSort = result.feedrSort || 'price-asc';
       detectBudget();
       applyHiding();
+      sortCards(currentSort);
     });
   }
 

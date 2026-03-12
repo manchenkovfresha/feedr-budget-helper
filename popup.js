@@ -26,13 +26,7 @@
     return Object.values(providers).reduce((sum, p) => sum + p.affordable, 0);
   }
 
-  function sortedProviderEntries(providers) {
-    return Object.entries(providers).sort(([, a], [, b]) => {
-      const pA = a.total > 0 ? a.affordable / a.total : 0;
-      const pB = b.total > 0 ? b.affordable / b.total : 0;
-      return pB - pA;
-    });
-  }
+  let currentSort = 'price-asc';
 
   // ---------------------------------------------------------------------------
   // Canvas image export
@@ -47,7 +41,7 @@
     const font = (size, weight = '400') =>
       `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 
-    const entries = sortedProviderEntries(providers);
+    const entries = Object.entries(providers).sort(([a], [b]) => a.localeCompare(b));
     const overallPct = totalCount > 0 ? Math.round((affordable / totalCount) * 100) : 0;
 
     // Calculate canvas height by tracing the draw path
@@ -185,7 +179,7 @@
   // ---------------------------------------------------------------------------
 
   function renderProviderRows(providers) {
-    const entries = sortedProviderEntries(providers);
+    const entries = Object.entries(providers).sort(([a], [b]) => a.localeCompare(b));
     if (!entries.length) return '';
 
     return entries.map(([name, { total, affordable: aff }]) => {
@@ -221,7 +215,8 @@
   function render(status) {
     if (!contentEl) return;
 
-    const { budget, totalCount, providers = {}, showAll, orderPlaced, includePaid = true, paidBudget = 0 } = status;
+    const { budget, totalCount, providers = {}, showAll, orderPlaced, includePaid = true, paidBudget = 0, currentSort: sortFromPage } = status;
+    if (sortFromPage) currentSort = sortFromPage;
 
     if (orderPlaced) {
       contentEl.innerHTML = '<p class="order-placed">✅ Your order has been placed.<br>Select another day to see the options.</p>';
@@ -243,7 +238,17 @@
       <p class="stat">Available: <strong>${escHtml(formatBudget(budget))}</strong></p>
       <p class="stat">Affordable: <strong>${affordable} / ${totalCount} (${overallPct}%)</strong></p>
       ${paidToggle}
-      ${providerRows ? `<hr class="divider" />${providerRows}` : ''}
+      ${providerRows ? `<hr class="divider" />
+        <div class="sort-row">
+          <label for="sortSelect">Sort</label>
+          <select id="sortSelect">
+            <option value="price-asc"${currentSort === 'price-asc' ? ' selected' : ''}>Price: low → high</option>
+            <option value="price-desc"${currentSort === 'price-desc' ? ' selected' : ''}>Price: high → low</option>
+            <option value="name-asc"${currentSort === 'name-asc' ? ' selected' : ''}>Name: A → Z</option>
+            <option value="name-desc"${currentSort === 'name-desc' ? ' selected' : ''}>Name: Z → A</option>
+          </select>
+        </div>
+        ${providerRows}` : ''}
       <hr class="divider" />
       <div class="actions">
         <button class="${btnClass}" id="toggleBtn">${btnLabel}</button>
@@ -255,6 +260,15 @@
     if (includePaidCb) {
       includePaidCb.addEventListener('change', () => {
         sendSetIncludePaid(includePaidCb.checked);
+      });
+    }
+
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) {
+      sortSelect.addEventListener('change', () => {
+        currentSort = sortSelect.value;
+        chrome.storage.local.set({ feedrSort: currentSort });
+        sendToTab({ action: 'sortCards', sort: currentSort });
       });
     }
 

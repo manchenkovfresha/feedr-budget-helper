@@ -32,7 +32,7 @@
   // Canvas image export
   // ---------------------------------------------------------------------------
 
-  function drawStatsImage(budget, affordable, totalCount, providers) {
+  function drawStatsImage(budget, affordable, totalCount, providers, sections) {
     const SCALE = 2;
     const W = 300;
     const PAD = 18;
@@ -42,10 +42,16 @@
       `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 
     const entries = Object.entries(providers).sort(([a], [b]) => a.localeCompare(b));
+    const SECTION_ORDER = ['Mains', 'Sides', 'Drinks'];
+    const sectionEntries = SECTION_ORDER.filter(s => sections && sections[s]).map(s => [s, sections[s]]);
     const overallPct = totalCount > 0 ? Math.round((affordable / totalCount) * 100) : 0;
 
     // Calculate canvas height by tracing the draw path
     let H = HEADER_H + 16 + 14 + 22; // header + stat lines
+    if (sectionEntries.length) {
+      H += 14 + 14;                        // divider padding
+      H += sectionEntries.length * 30;     // per section: label + bar
+    }
     if (entries.length) {
       H += 14 + 14;                    // divider padding
       H += entries.length * 30;        // per provider: label + bar
@@ -112,6 +118,45 @@
     ctx.fillStyle = GREEN;
     ctx.fillText(affStr, W - PAD - ctx.measureText(affStr).width, y);
 
+    // Section rows
+    if (sectionEntries.length) {
+      y += 14;
+      ctx.strokeStyle = '#eeeeee';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD, y);
+      ctx.lineTo(W - PAD, y);
+      ctx.stroke();
+      y += 14;
+
+      for (const [name, { total, affordable: aff }] of sectionEntries) {
+        const pct = total > 0 ? Math.round((aff / total) * 100) : 0;
+        const pctStr = `${aff}/${total}  ${pct}%`;
+
+        ctx.font = font(12, '500');
+        ctx.fillStyle = '#333333';
+        ctx.fillText(name, PAD, y);
+
+        ctx.font = font(12, 'bold');
+        ctx.fillStyle = GREEN;
+        ctx.fillText(pctStr, W - PAD - ctx.measureText(pctStr).width, y);
+
+        y += 8;
+        const barW = W - PAD * 2;
+        ctx.fillStyle = '#eeeeee';
+        ctx.beginPath();
+        ctx.roundRect(PAD, y, barW, 5, 2.5);
+        ctx.fill();
+        if (pct > 0) {
+          ctx.fillStyle = GREEN;
+          ctx.beginPath();
+          ctx.roundRect(PAD, y, barW * pct / 100, 5, 2.5);
+          ctx.fill();
+        }
+        y += 22;
+      }
+    }
+
     // Provider rows
     if (entries.length) {
       y += 14;
@@ -154,8 +199,8 @@
     return canvas;
   }
 
-  function copyStatsImage(budget, affordable, totalCount, providers) {
-    const canvas = drawStatsImage(budget, affordable, totalCount, providers);
+  function copyStatsImage(budget, affordable, totalCount, providers, sections) {
+    const canvas = drawStatsImage(budget, affordable, totalCount, providers, sections);
     canvas.toBlob((blob) => {
       navigator.clipboard
         .write([new ClipboardItem({ 'image/png': blob })])
@@ -212,10 +257,34 @@
     sendToTab({ action: 'setIncludePaid', includePaid: value });
   }
 
+  function sendSetCategoryEnabled(categoryEnabled) {
+    chrome.storage.local.set({ feedrCategoryEnabled: categoryEnabled });
+    sendToTab({ action: 'setCategoryEnabled', categoryEnabled });
+  }
+
+  function renderSectionToggles(sections, categoryEnabled) {
+    const knownSections = ['Mains', 'Sides', 'Drinks'];
+    const activeSections = knownSections.filter(s => sections && sections[s]);
+    if (!activeSections.length) return '';
+
+    const rows = activeSections.map(name => {
+      const { total = 0, affordable = 0 } = (sections && sections[name]) || {};
+      const enabled = categoryEnabled[name] !== false;
+      return `
+        <label class="section-toggle">
+          <input type="checkbox" data-section="${escHtml(name)}"${enabled ? ' checked' : ''} />
+          <span class="section-name">${escHtml(name)}</span>
+          <span class="section-stat">${affordable}/${total}</span>
+        </label>`;
+    }).join('');
+
+    return `<hr class="divider" /><div class="section-label">Apply budget per section</div>${rows}`;
+  }
+
   function render(status) {
     if (!contentEl) return;
 
-    const { budget, totalCount, providers = {}, showAll, orderPlaced, includePaid = true, paidBudget = 0, currentSort: sortFromPage } = status;
+    const { budget, totalCount, providers = {}, sections = {}, categoryEnabled = {}, showAll, orderPlaced, includePaid = true, paidBudget = 0, currentSort: sortFromPage } = status;
     if (sortFromPage) currentSort = sortFromPage;
 
     if (orderPlaced) {
@@ -223,9 +292,20 @@
       return;
     }
 
-    // Derive affordable from price data — correct even when showAll hides the overlays
-    const affordable = totalAffordable(providers);
-    const overallPct = totalCount > 0 ? Math.round((affordable / totalCount) * 100) : 0;
+    // Derive affordable from price data — correct even when showAll hides the overlays.
+    // Subtract disabled sections so the overall stat reflects only what is being filtered.
+    const KNOWN_SECTIONS = ['Mains', 'Sides', 'Drinks'];
+    let effectiveTotal = totalCount;
+    let effectiveAffordable = totalAffordable(providers);
+    for (const s of KNOWN_SECTIONS) {
+      if (sections[s] && categoryEnabled[s] === false) {
+        effectiveTotal -= sections[s].total;
+        effectiveAffordable -= sections[s].affordable;
+      }
+    }
+    effectiveTotal = Math.max(0, effectiveTotal);
+    effectiveAffordable = Math.max(0, effectiveAffordable);
+    const overallPct = effectiveTotal > 0 ? Math.round((effectiveAffordable / effectiveTotal) * 100) : 0;
     const providerRows = renderProviderRows(providers);
     const btnClass = showAll ? 'hide' : 'show';
     const btnLabel = showAll ? 'Re-apply budget overlays' : 'Show all meals';
@@ -234,10 +314,13 @@
       ? `<label class="option"><input type="checkbox" id="includePaidCb"${includePaid ? ' checked' : ''} /> Include paid balance (£${paidBudget.toFixed(2)})</label>`
       : '';
 
+    const sectionToggles = renderSectionToggles(sections, categoryEnabled);
+
     contentEl.innerHTML = `
       <p class="stat">Available: <strong>${escHtml(formatBudget(budget))}</strong></p>
-      <p class="stat">Affordable: <strong>${affordable} / ${totalCount} (${overallPct}%)</strong></p>
+      <p class="stat">Affordable: <strong>${effectiveAffordable} / ${effectiveTotal} (${overallPct}%)</strong></p>
       ${paidToggle}
+      ${sectionToggles}
       ${providerRows ? `<hr class="divider" />
         <div class="sort-row">
           <label for="sortSelect">Sort</label>
@@ -263,6 +346,14 @@
       });
     }
 
+    for (const cb of contentEl.querySelectorAll('input[data-section]')) {
+      cb.addEventListener('change', () => {
+        const section = cb.dataset.section;
+        const updated = { ...categoryEnabled, [section]: cb.checked };
+        sendSetCategoryEnabled(updated);
+      });
+    }
+
     const sortSelect = document.getElementById('sortSelect');
     if (sortSelect) {
       sortSelect.addEventListener('change', () => {
@@ -277,7 +368,7 @@
     });
 
     document.getElementById('shareBtn').addEventListener('click', () => {
-      copyStatsImage(budget, affordable, totalCount, providers);
+      copyStatsImage(budget, effectiveAffordable, effectiveTotal, providers, sections);
     });
   }
 

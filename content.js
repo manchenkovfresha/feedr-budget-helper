@@ -6,6 +6,7 @@
   let includePaid = true;
   let showAll = false;
   let currentSort = 'price-asc';
+  let categoryEnabled = { Mains: true, Sides: true, Drinks: true };
   let observer = null;
   let applyTimer = null;
 
@@ -65,6 +66,23 @@
       }
     }
     return results;
+  }
+
+  // Walk up from a card to find the nearest preceding section header (Mains/Sides/Drinks).
+  // Section headers are h6.MuiTypography-subtitle2 elements inside sibling grid items.
+  function getSectionForCard(card) {
+    let item = card.parentElement;
+    while (item && !item.classList.contains('MuiGrid-item')) {
+      item = item.parentElement;
+    }
+    if (!item) return null;
+    let sibling = item.previousElementSibling;
+    while (sibling) {
+      const h6 = sibling.querySelector('h6.MuiTypography-subtitle2');
+      if (h6) return h6.textContent.trim();
+      sibling = sibling.previousElementSibling;
+    }
+    return null;
   }
 
   // Walk up the DOM until we find the MuiCard-root wrapping this price element.
@@ -153,7 +171,9 @@
         if (!card || seen.has(card)) continue;
         seen.add(card);
 
-        if (price > budget) {
+        const section = getSectionForCard(card);
+        const sectionEnabled = section === null || categoryEnabled[section] !== false;
+        if (sectionEnabled && price > budget) {
           card.style.position = 'relative';
           const overlay = document.createElement('div');
           overlay.className = 'feedr-overlay';
@@ -286,6 +306,7 @@
       const totalCount = allPriceEls.length;
       const knownVendors = getKnownVendors();
       const providers = {};
+      const sections = {};
       const seen = new Set();
 
       for (const { el, price } of allPriceEls) {
@@ -293,10 +314,17 @@
         if (!card || seen.has(card)) continue;
         seen.add(card);
         const name = getProviderName(card, knownVendors);
-        if (!name) continue;
-        if (!providers[name]) providers[name] = { total: 0, affordable: 0 };
-        providers[name].total++;
-        if (price <= (budget ?? Infinity)) providers[name].affordable++;
+        if (name) {
+          if (!providers[name]) providers[name] = { total: 0, affordable: 0 };
+          providers[name].total++;
+          if (price <= (budget ?? Infinity)) providers[name].affordable++;
+        }
+        const section = getSectionForCard(card);
+        if (section) {
+          if (!sections[section]) sections[section] = { total: 0, affordable: 0 };
+          sections[section].total++;
+          if (price <= (budget ?? Infinity)) sections[section].affordable++;
+        }
       }
 
       sendResponse({
@@ -306,6 +334,8 @@
         hiddenCount: getHiddenCount(),
         totalCount,
         providers,
+        sections,
+        categoryEnabled,
         showAll,
         currentSort,
         orderPlaced: detectOrderPlaced(),
@@ -334,6 +364,13 @@
       sendResponse({ ok: true });
       return true;
     }
+
+    if (message.action === 'setCategoryEnabled') {
+      categoryEnabled = { ...categoryEnabled, ...message.categoryEnabled };
+      applyHiding();
+      sendResponse({ ok: true });
+      return true;
+    }
   });
 
   // ---------------------------------------------------------------------------
@@ -341,10 +378,13 @@
   // ---------------------------------------------------------------------------
 
   function init() {
-    chrome.storage.local.get(['feedrShowAll', 'feedrIncludePaid', 'feedrSort'], (result) => {
+    chrome.storage.local.get(['feedrShowAll', 'feedrIncludePaid', 'feedrSort', 'feedrCategoryEnabled'], (result) => {
       showAll = !!result.feedrShowAll;
       includePaid = result.feedrIncludePaid !== false; // default true
       currentSort = result.feedrSort || 'price-asc';
+      if (result.feedrCategoryEnabled) {
+        categoryEnabled = { ...categoryEnabled, ...result.feedrCategoryEnabled };
+      }
       detectBudget();
       applyHiding();
       sortCards(currentSort);

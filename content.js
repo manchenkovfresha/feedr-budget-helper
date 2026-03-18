@@ -178,7 +178,7 @@
           const overlay = document.createElement('div');
           overlay.className = 'feedr-overlay';
           overlay.style.cssText = [
-            'position:absolute', 'inset:0', 'z-index:9999',
+            'position:absolute', 'inset:0', 'z-index:1',
             'background:rgba(0,0,0,0.6)', 'border-radius:inherit',
             'display:flex', 'align-items:center', 'justify-content:center',
             'pointer-events:none',
